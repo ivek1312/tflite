@@ -25,12 +25,15 @@ import android.content.DialogInterface;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -46,6 +49,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.res.ResourcesCompat;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.util.Log;
@@ -109,7 +113,7 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-          openCamera(width, height);
+//          openCamera(width, height);
         }
 
         @Override
@@ -493,16 +497,17 @@ public class Camera2BasicFragment extends Fragment
    */
   private void setUpCameraOutputs(int width, int height) {
     Activity activity = getActivity();
+    Log.e(TAG, "ID kamere je: " + cameraId);
     CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
     try {
       for (String cameraId : manager.getCameraIdList()) {
         CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
 
         // We don't use a front facing camera in this sample.
-        Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-        if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
-          continue;
-        }
+//        Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+//        if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+//          continue;
+//        }
 
         StreamConfigurationMap map =
             characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
@@ -623,17 +628,20 @@ public class Camera2BasicFragment extends Fragment
     setUpCameraOutputs(width, height);
     configureTransform(width, height);
     Activity activity = getActivity();
-    CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
-    try {
-      if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-        throw new RuntimeException("Time out waiting to lock camera opening.");
-      }
-      manager.openCamera(cameraId, stateCallback, backgroundHandler);
-    } catch (CameraAccessException e) {
-      Log.e(TAG, "Failed to open Camera", e);
-    } catch (InterruptedException e) {
-      throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
-    }
+//    CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+//    try {
+//      if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+//        throw new RuntimeException("Time out waiting to lock camera opening.");
+//      }
+////      Log.d(TAG, "Camera test"+manager.getCameraIdList()[0]);
+//      Log.d(TAG, "Camera test");
+////      manager.openCamera(cameraId, stateCallback, backgroundHandler);
+//
+//    } catch (CameraAccessException e) {
+//      Log.e(TAG, "Failed to open Camera", e);
+//    } catch (InterruptedException e) {
+//      throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+//    }
   }
 
   private boolean allPermissionsGranted() {
@@ -809,16 +817,32 @@ public class Camera2BasicFragment extends Fragment
 
   /** Classifies a frame from the preview stream. */
   private void classifyFrame() {
-    if (classifier == null || getActivity() == null || cameraDevice == null) {
-      // It's important to not call showToast every frame, or else the app will starve and
-      // hang. updateActiveModel() already puts an error message up with showToast.
-      // showToast("Uninitialized Classifier or invalid context.");
+//    if (classifier == null || getActivity() == null || cameraDevice == null) {
+    if (classifier == null || getActivity() == null) {
+
+//      // It's important to not call showToast every frame, or else the app will starve and
+//      // hang. updateActiveModel() already puts an error message up with showToast.
+//      // showToast("Uninitialized Classifier or invalid context.");
       return;
     }
+//    SpannableStringBuilder textToShow = new SpannableStringBuilder();
+//    Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
+//    classifier.classifyFrame(bitmap, textToShow);
+//    bitmap.recycle();
+//    showToast(textToShow);
+
+
+//
+
+//    Resources res = getResources();
+//    Drawable laptoptemp = ResourcesCompat.getDrawable(res, R.drawable.laptop, null);
+//    textureView.setBackground(drawable);
+
     SpannableStringBuilder textToShow = new SpannableStringBuilder();
-    Bitmap bitmap = textureView.getBitmap(classifier.getImageSizeX(), classifier.getImageSizeY());
-    classifier.classifyFrame(bitmap, textToShow);
-    bitmap.recycle();
+    Bitmap laptop = ((BitmapDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.logo, null)).getBitmap();
+
+    classifier.classifyFrame(laptop, textToShow);
+
     showToast(textToShow);
   }
 

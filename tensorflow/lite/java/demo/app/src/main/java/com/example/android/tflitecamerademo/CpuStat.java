@@ -1,3 +1,7 @@
+package com.example.android.tflitecamerademo;
+
+import android.util.Log;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -8,6 +12,9 @@ public class CpuStat {
     private RandomAccessFile statFile;
     private CpuInfo mCpuInfoTotal;
     private ArrayList<CpuInfo> mCpuInfoList;
+    private ArrayList<Integer> mClusterUsage =new ArrayList<Integer>();
+    private int counter = 0;
+
 
     public CpuStat() {
     }
@@ -81,6 +88,7 @@ public class CpuStat {
         }
     }
 
+
     public int getCpuUsage(int cpuId) {
         update();
         int usage = 0;
@@ -108,6 +116,35 @@ public class CpuStat {
         if (mCpuInfoTotal != null)
             usage = mCpuInfoTotal.getUsage();
         return usage;
+    }
+
+    public String getClusterUsage() {
+        update();
+
+        counter++;
+
+
+        if (mCpuInfoList != null) {
+            for (int i = 0; i < mCpuInfoList.size(); i++) {
+                CpuInfo info = mCpuInfoList.get(i);
+
+                if (mClusterUsage.size() > (i/4))
+                    mClusterUsage.set(i / 4, info.getUsage() + mClusterUsage.get(i / 4));
+                else mClusterUsage.add(info.getUsage());
+                info.getUsage();
+            }
+
+        }
+
+        StringBuffer buf = new StringBuffer();
+
+        for (int i = 0; i < mClusterUsage.size(); i++) {
+            buf.append("\nCluster"+i+":");
+            buf.append(String.format("%3d", mClusterUsage.get(i)/counter));
+            buf.append(" ");
+        }
+
+        return buf.toString();
     }
 
 
@@ -159,6 +196,7 @@ public class CpuStat {
             //      6 irq: servicing interrupts
             //      7 softirq: servicing softirqs
             //
+
             long idle = Long.parseLong(parts[4], 10);
             long total = 0;
             boolean head = true;

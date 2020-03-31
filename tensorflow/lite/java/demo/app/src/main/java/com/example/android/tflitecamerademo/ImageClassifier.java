@@ -18,6 +18,8 @@ package com.example.android.tflitecamerademo;
 import android.app.Activity;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
@@ -25,9 +27,12 @@ import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
@@ -85,6 +90,15 @@ public abstract class ImageClassifier {
   private static final int FILTER_STAGES = 3;
   private static final float FILTER_FACTOR = 0.4f;
 
+  private int counter = 0;
+  private long cumTime = 0;
+
+  private Integer littleFreq = 0;
+  private Integer bigFreq = 0;
+  private Integer temperature = 0;
+
+
+
   private PriorityQueue<Map.Entry<String, Float>> sortedLabels =
       new PriorityQueue<>(
           RESULTS_TO_SHOW,
@@ -94,6 +108,9 @@ public abstract class ImageClassifier {
               return (o1.getValue()).compareTo(o2.getValue());
             }
           });
+
+  CpuStat cpu = new CpuStat();
+
 
   /** holds a gpu delegate */
   GpuDelegate gpuDelegate = null;
@@ -123,12 +140,62 @@ public abstract class ImageClassifier {
       Log.e(TAG, "Image classifier has not been initialized; Skipped.");
       builder.append(new SpannableString("Uninitialized Classifier."));
     }
+
+
     convertBitmapToByteBuffer(bitmap);
     // Here's where the magic happens!!!
     long startTime = SystemClock.uptimeMillis();
+
+
     runInference();
     long endTime = SystemClock.uptimeMillis();
     Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
+
+
+    Integer reading = 0;
+
+    RandomAccessFile reader = null;
+
+    try {
+      reader = new RandomAccessFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r");
+      reading = Integer.parseInt (reader.readLine());
+      reader.close();
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    littleFreq = littleFreq+reading;
+
+    RandomAccessFile reader2 = null;
+    try {
+      reader2 = new RandomAccessFile("/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq", "r");
+      reading = Integer.parseInt(reader2.readLine());
+      reader2.close();
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    bigFreq = bigFreq+reading;
+
+
+    RandomAccessFile reader3 = null;
+    try {
+      reader3 = new RandomAccessFile("/sys/devices/virtual/thermal/thermal_zone0/temp", "r");
+      reading = Integer.parseInt(reader3.readLine());
+      reader3.close();
+    } catch (FileNotFoundException e) {
+      e.printStackTrace();
+      Log.d(TAG, "Temperature file could not be open");
+
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    temperature = temperature+reading;
+
+
 
     // Smooth the results across frames.
     applyFilter();
@@ -136,9 +203,29 @@ public abstract class ImageClassifier {
     // Print the results.
     printTopKLabels(builder);
     long duration = endTime - startTime;
-    SpannableString span = new SpannableString(duration + " ms");
+
+    cumTime = cumTime+duration;
+    counter++;
+
+
+
+
+
+    SpannableString span = new SpannableString((cumTime/counter) + " ms/frame, LFreq="+(littleFreq/counter)+", BFreq="+(bigFreq/counter)+", Temp="+(temperature/counter)+cpu.getClusterUsage());
+
+//    SpannableString span = new SpannableString(Integer.toString(cpu.getCpuUsage(7)));
+//    SpannableString span = new SpannableString(Integer.toString(cpu.getTotalCpuUsage()));
+
+    //https://source.android.com/security/selinux/validate
+    //https://source.android.com/reference/tradefed/com/android/tradefed/device/CpuStatsCollector.CpuStats
+    //https://github.com/takke/cpustats/blob/master/app/src/main/java/jp/takke/cpustats/CpuInfoCollector.kt
+    //setprop service.adb.tcp.port 5555
+
+
+
     span.setSpan(new ForegroundColorSpan(android.graphics.Color.LTGRAY), 0, span.length(), 0);
     builder.append(span);
+
   }
 
   void applyFilter() {
@@ -167,12 +254,15 @@ public abstract class ImageClassifier {
     if (tflite != null) {
       tflite.close();
       tflite = new Interpreter(tfliteModel, tfliteOptions);
+      counter = 0;
+      cumTime = 0;
     }
   }
 
   public void useGpu() {
     if (gpuDelegate == null) {
       gpuDelegate = new GpuDelegate();
+      tfliteOptions.setAllowFp16PrecisionForFp32(true);
       tfliteOptions.addDelegate(gpuDelegate);
       recreateInterpreter();
     }
@@ -237,7 +327,7 @@ public abstract class ImageClassifier {
       return;
     }
     imgData.rewind();
-    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+//    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     // Convert the image to floating point.
     int pixel = 0;
     long startTime = SystemClock.uptimeMillis();
